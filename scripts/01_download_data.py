@@ -7,7 +7,7 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data import download_price_data, get_combined_data
+from src.data import get_combined_dataset
 
 # --- Configuración de usuario ---
 TICKERS      = ["SPY", "TLT", "GLD"]
@@ -17,24 +17,26 @@ FRED_API_KEY = "14f7d5dc732ec05d73eab8ab21852b5a"
 
 # Directorio de salida
 OUT_DIR = Path(__file__).parents[1] / "datasets"
-OUT_DIR.mkdir(exist_ok=True)
 
-# Calculamos fecha de descarga anticipada para indicadores lookback
-download_start = pd.to_datetime(DATA_START) - timedelta(days=300)
+def main():
+    """Descarga y almacena precios y dataset combinado."""
+    # Crear directorio de salida
+    OUT_DIR.mkdir(exist_ok=True)
 
-# Descarga de precios y macro + cálculo de indicadores
-raw_df = download_price_data(TICKERS, download_start, DATA_END)
-combined_df = get_combined_data(TICKERS, download_start, DATA_END, FRED_API_KEY)
+    # Fecha de descarga anticipada para indicadores lookback
+    download_start = pd.to_datetime(DATA_START) - timedelta(days=300)
 
-# Filtramos al rango definido por el usuario
-raw_df = raw_df.loc[DATA_START:]
-combined_df = combined_df.loc[DATA_START:]
+    # Descarga de datos
+    combined_df = get_combined_dataset(TICKERS, download_start, DATA_END, FRED_API_KEY)
 
-# Guardamos los ficheros
-raw_df.to_csv(OUT_DIR / "raw_data.csv")
-combined_df.to_csv(OUT_DIR / "combined_data.csv")
+    # Filtrado al rango definido
+    combined_df = combined_df.loc[DATA_START:]
 
-print(
-    f"Datos guardados en {OUT_DIR} — "
-    f"filas: {len(combined_df)}, columnas: {combined_df.shape[1]}"
-)
+    # Guardado de ficheros
+    combined_df.to_csv(OUT_DIR / "combined_data.csv")
+
+    # Informe de resultados
+    print(f"Datos guardados en {OUT_DIR} — filas: {len(combined_df)}, columnas: {combined_df.shape[1]}")
+
+if __name__ == "__main__":
+    main()
