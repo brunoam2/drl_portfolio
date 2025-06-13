@@ -1,61 +1,48 @@
 import numpy as np
+import pandas as pd
 
-def compute_sharpe_sortino(log_rets):
+def evaluate_performance(returns: pd.Series, turnovers: pd.Series, cumulative_returns: pd.Series, periods_per_year: int = 252) -> pd.Series:
     """
-    Calcula Sharpe y Sortino anuales a partir de retornos logarítmicos diarios.
+    Calcula métricas de desempeño:
+    - cumulative_return (a partir de la serie de log-retornos convertida internamente)
+    - sharpe_ratio (anualizado, tasa libre de riesgo cero)
+    - sortino_ratio (anualizado, tasa libre de riesgo cero)
+    - max_drawdown
+    - average_daily_turnover
     """
-    if len(log_rets) > 1:
-        mean = np.mean(log_rets)
-        std = np.std(log_rets) + 1e-8
-        sharpe = mean / std * np.sqrt(252)
-        downside = log_rets[log_rets < 0]
-        sortino = (mean / (np.std(downside) + 1e-8) * np.sqrt(252)) if len(downside) > 0 else np.nan
-    else:
-        sharpe, sortino = np.nan, np.nan
-    return sharpe, sortino
+    # Convertir log-retornos y log-retornos acumulados a retornos aritméticos
+    arith_returns = np.expm1(returns)
+    arith_cum_returns = np.expm1(cumulative_returns)
 
-def compute_max_drawdown(equity):
-    """
-    Calcula el máximo drawdown de la serie de valores de portafolio.
-    """
-    high_water = np.maximum.accumulate(equity)
-    drawdowns = (high_water - equity) / high_water
-    return np.max(drawdowns)
+    # Ratio de Sharpe anualizado sobre retornos aritméticos
+    mean_annual = arith_returns.mean() * periods_per_year
+    vol_annual = arith_returns.std() * np.sqrt(periods_per_year)
+    sharpe_ratio = mean_annual / vol_annual if vol_annual != 0 else np.nan
 
-def evaluate_agent(env, model):
-    """
-    Evalúa un agente entrenado en un entorno Gym de portafolio:
-    - Ejecuta episodios hasta done.
-    - Devuelve cum_ret, sharpe, sortino, max_drawdown, turnover.
-    """
-    obs, _ = env.reset()
-    done = False
-    cum_rewards = []
-    turnovers = []
-    while not done:
-        action, _ = model.predict(obs, deterministic=True)
-        obs, reward, done, _, info = env.step(action)
-        cum_rewards.append(info["accumulated_reward"])
-        turnovers.append(info.get("turnover", 0.0))
-    equity = np.exp(cum_rewards)
-    log_rets = np.diff(np.log(equity))
-    cum_return = equity[-1] - 1.0
-    sharpe, sortino = compute_sharpe_sortino(log_rets)
-    mdd = compute_max_drawdown(equity)
-    avg_turnover = float(np.mean(turnovers)) if turnovers else 0.0
-    return cum_return, sharpe, sortino, mdd, avg_turnover
+    # Ratio de Sortino anualizado sobre retornos aritméticos
+    downside = arith_returns[arith_returns < 0]
+    downside_deviation = downside.std() * np.sqrt(periods_per_year)
+    sortino_ratio = mean_annual / downside_deviation if downside_deviation != 0 else np.nan
 
-def buy_and_hold_metrics(df):
-    """
-    Calcula métricas para la estrategia Buy & Hold sobre SPY:
-    - df debe contener la columna 'SPY_logret'.
-    """
-    spy_lr = df["SPY_logret"].values
-    equity = np.empty(len(spy_lr) + 1, dtype=float)
-    equity[0] = 1.0
-    equity[1:] = np.cumprod(np.exp(spy_lr))
-    cum_return = equity[-1] - 1.0
-    log_rets = np.diff(np.log(equity))
-    sharpe, sortino = compute_sharpe_sortino(log_rets)
-    mdd = compute_max_drawdown(equity)
-    return cum_return, sharpe, sortino, mdd
+    # Convertir serie acumulada de log-retornos a retornos aritméticos
+
+    # Curva de riqueza: 1 + retornos acumulados aritméticos
+    wealth = 1 + arith_cum_returns
+    peaks = wealth.cummax()
+    drawdowns = (wealth - peaks) / peaks
+    max_drawdown = drawdowns.min()
+
+    # Retorno acumulado final en escala aritmética
+    arith_cumulative_return = arith_cum_returns.iloc[-1]
+
+    # Promedio diario de turnover
+    average_daily_turnover = turnovers.mean()
+
+    metrics = {
+        'cumulative_return': arith_cumulative_return,
+        'sharpe_ratio': sharpe_ratio,
+        'sortino_ratio': sortino_ratio,
+        'max_drawdown': max_drawdown,
+        'average_daily_turnover': average_daily_turnover,
+    }
+    return pd.Series(metrics)

@@ -22,6 +22,10 @@ def compute_technical_indicators(price_df):
         log_return = np.log(price_series / price_series.shift(1))
         indicator_df[f"{ticker}_LogReturn"] = log_return
 
+        # Retornos lineales (aritméticos) diarios
+        arith_return = price_series.pct_change()
+        indicator_df[f"{ticker}_Return"] = arith_return
+
         # Diferencia porcentual SMA200
         sma_200 = price_series.rolling(window=200, min_periods=200).mean()
         indicator_df[f"{ticker}_RelativeSMA200"] = (price_series - sma_200) / sma_200
@@ -40,27 +44,31 @@ def compute_technical_indicators(price_df):
 
 
 def download_macroeconomic_data(fred_api_key, start_date, end_date, reference_index):
-    """Descargar datos macroeconómicos diarios: CPI, GDPC1, FEDFUNDS, VIX, DX."""
+    """Descargar datos macroeconómicos diarios (raw, aritméticos y logarítmicos): CPI, GDPC1, FEDFUNDS, VIX, DX."""
     fred_client = Fred(api_key=fred_api_key)
     macro_df = pd.DataFrame(index=reference_index)
 
-    # Definición de series macroeconómicas: (símbolo, nombre de columna, modo)
+    # Definición de series macroeconómicas: (símbolo, nombre de columna)
     macro_series = [
-        ('CPIAUCSL', 'CPIAUCSL_LogReturnMonthly', 'log'),
-        ('FEDFUNDS', 'FederalFundsRate', 'level'),
-        ('DTWEXAFEGS', 'DX_LogReturn', 'log'),
+        ('CPIAUCSL', 'CPIAUCSL'),
+        ('FEDFUNDS', 'FederalFundsRate'),
+        ('DTWEXAFEGS', 'DX'),
     ]
 
-    for symbol, column_name, mode in macro_series:
+    for symbol, column_name in macro_series:
         orig_series = fred_client.get_series(symbol, observation_start=start_date, observation_end=end_date)
-        # Calcular log-retorno sobre la frecuencia original (mensual/trimestral)
-        if mode == 'log':
-            transformed = np.log(orig_series / orig_series.shift(1))
-        else:
-            transformed = orig_series
-        # Reindexar a diario y rellenar hacia adelante con el valor calculado
-        series = transformed.reindex(reference_index).ffill()
-        macro_df[column_name] = series
+        # Guardar valor raw
+        raw = orig_series.reindex(reference_index).ffill()
+        macro_df[f"{column_name}_Raw"] = raw
+
+        # Retorno aritmético diario, con 0 explícito para días sin cambio o sin datos previos
+        arith = raw.pct_change().fillna(0)
+        macro_df[f"{column_name}_Return"] = arith
+
+        # Retorno logarítmico diario, también rellenando NaN con 0
+        log = np.log1p(arith).fillna(0)
+        macro_df[f"{column_name}_LogReturn"] = log
+        continue
 
     return macro_df
 

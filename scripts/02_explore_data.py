@@ -1,62 +1,79 @@
-# scripts/02_explore_data.py
-
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+import os
+import sys
 from pathlib import Path
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
-# Columnas a procesar
-ASSET_RETURNS_COLS = ['SPY_LogReturn', 'TLT_LogReturn', 'GLD_LogReturn']
-MACRO_COLS = ['CPIAUCSL_LogReturnMonthly', 'FederalFundsRate', 'DX_LogReturn']
+# Añadimos el project root al path para que `import src` funcione
+PROJECT_ROOT = Path(__file__).parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
 
-# Rutas de entrada y salida
-BASE = Path(__file__).resolve().parents[1]
-DATA = BASE / 'datasets' / 'combined_data.csv'
-OUT  = BASE / 'results' / 'explore_data'
-OUT.mkdir(parents=True, exist_ok=True)
+INPUT_DIR = "datasets"
+OUTPUT_DIR = "results/explore_data"
 
-def plot_and_save(series, title, filename, ylabel, kind='line'):
-    """Helper to plot a pandas Series or DataFrame and save the figure."""
-    ax = series.plot(kind=kind, figsize=(8,4), title=title)
-    if kind != 'kde':
-        ax.set_xlabel('Fecha')
-    ax.set_ylabel(ylabel)
-    plt.tight_layout()
-    plt.savefig(OUT / filename)
-    plt.close()
+data = pd.read_csv(os.path.join(INPUT_DIR, "combined_data.csv"), index_col=0, parse_dates=True)
 
-# Carga y sanity check
-df = pd.read_csv(DATA, index_col=0, parse_dates=True)
-print(f"Datos: {df.shape[0]} filas x {df.shape[1]} columnas")
-assert not df.isna().any().any(), "Error: hay valores NaN en combined_data"
+numeric_data = data.select_dtypes(include=["number"])
 
-# 1) Stats de log-retornos de activos
-asset_logret = df[ASSET_RETURNS_COLS]
-stats = asset_logret.describe().T[['mean','std']]
-stats['skew'] = asset_logret.skew()
-stats.to_csv(OUT / '01_stats_logreturn.csv')
+# Variables de activos
+asset_vars = [c for c in numeric_data.columns if any(c.startswith(t) for t in ["SPY", "TLT", "GLD"])]
 
-# 2) KDE conjunta de log-retornos de activos
-plot_and_save(asset_logret, '02 KDE log-retornos diarios', '02_kde_logret.png', 'Densidad', kind='kde')
+# Subgrupos técnicos
+logret_vars  = [c for c in asset_vars if c.endswith("_LogReturn")]
+arithret_vars= [c for c in asset_vars if c.endswith("_Return")]
+sma_vars     = [c for c in asset_vars if c.endswith("_RelSMA200")]
+rsi_vars     = [c for c in asset_vars if c.endswith("_RSI14")]
+vol_vars     = [c for c in asset_vars if c.endswith("_Vol21")]
 
-# 3) Curva acumulada conjunta de activos
-plot_and_save(np.exp(asset_logret.cumsum()), '03 Valor acumulado de activos', '03_cum_returns.png', 'Acumulado (base 1)')
+#
+# Definir variables log-retornos de activos
+logret_vars = [
+    c for c in numeric_data.columns
+    if c.endswith("_LogReturn") and c.split("_")[0] in ("SPY", "TLT", "GLD")
+]
 
-# 4) Gráficas individuales de datos macro
-for col in MACRO_COLS:
-    if col == 'DX_LogReturn':
-        plot_and_save(np.exp(df[col].cumsum()), f'04 {col} acumulado', f'04_macro_{col}_cum.png', 'Acumulado (base 1)')
-    else:
-        plot_and_save(df[col], f'04 {col}', f'04_macro_{col}.png', 'Valor')
+# Definir variables macro (excluye todo lo que comience con ticker de activos o sea nombre exacto de ticker)
+macro_vars = [
+    c for c in numeric_data.columns
+    if c not in logret_vars
+    and not any(c == pref or c.startswith(pref + "_") for pref in ("SPY", "TLT", "GLD"))
+]
 
-# 5) Correlación conjunta de retornos de activos y datos macroeconómicos
-corr_df = pd.concat([asset_logret, df[MACRO_COLS]], axis=1).corr()
+# Estadísticas descriptivas para todas las variables numéricas
+numeric_data.describe().to_csv(os.path.join(OUTPUT_DIR, "describe_all.csv"))
+
+# Matrices de correlación y gráficos
+
+# Matriz de correlación global de todas las variables numéricas
+corr_all = numeric_data.corr()
+corr_all.to_csv(os.path.join(OUTPUT_DIR, "corr_all.csv"))
 plt.figure(figsize=(12,10))
-sns.heatmap(corr_df, annot=True, fmt='.2f', cmap='coolwarm')
-plt.title('05 Correlación activos vs macroeconómicos')
+sns.heatmap(corr_all, annot=False, cmap="coolwarm")
+plt.title("Correlación global de variables")
 plt.tight_layout()
-plt.savefig(OUT / '05_corr_activos_macro.png')
+plt.savefig(os.path.join(OUTPUT_DIR, "corr_all.png"))
 plt.close()
 
-print("Exploración mínima completada. Salidas en:", OUT)
+# Correlación cruzada entre la media de LogReturns de activos y variables macro
+logret_vars = [
+    c for c in numeric_data.columns
+    if c.endswith("_LogReturn") and c.split("_")[0] in ("SPY", "TLT", "GLD")
+]
+macro_vars = [
+    c for c in numeric_data.columns
+    if c not in logret_vars and not any(c.startswith(pref + "_") for pref in ("SPY", "TLT", "GLD"))
+]
+
+asset_mean = numeric_data[logret_vars].mean(axis=1)
+cross_corr = numeric_data[macro_vars].apply(lambda col: asset_mean.corr(col))
+cross_corr.to_csv(os.path.join(OUTPUT_DIR, "corr_asset_macro.csv"))
+
+plt.figure(figsize=(10,6))
+cross_corr.plot(kind='bar')
+plt.title("Correlación Cruzada entre media de LogReturns de activos y Variables Macro")
+plt.ylabel("Correlación")
+plt.xticks(rotation=45, ha="right")
+plt.tight_layout()
+plt.savefig(os.path.join(OUTPUT_DIR, "corr_asset_macro.png"))
+plt.close()
