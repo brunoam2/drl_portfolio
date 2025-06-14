@@ -19,11 +19,10 @@ def build_observation_mlp(combined_data, step, lookback, asset_names=None):
 
     # Lista de columnas a usar
     cols = [
-        "SPY_LogReturn",
-        "TLT_LogReturn",
-        "GLD_LogReturn",
-        "SPY_RelativeSMA200",
-        "DX_Return"
+        "SPY_LogReturn", "SPY_RelativeSMA200", "SPY_RSI14", "SPY_Volatility21",
+        "GLD_LogReturn", "GLD_RelativeSMA200", "GLD_RSI14", "GLD_Volatility21",
+        "TLT_LogReturn", "TLT_RelativeSMA200", "TLT_RSI14", "TLT_Volatility21",
+        "DX_LogReturn", "CPIAUCSL_LogReturn", "FederalFundsRate_LogReturn"
     ]
 
     # Normalización z-score por columna (ventana)

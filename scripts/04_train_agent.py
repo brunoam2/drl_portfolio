@@ -21,15 +21,15 @@ from src.evaluation import evaluate_performance
 
 
 # --- User parameters (edit these) ---
-LOOKBACK = 60
-REBALANCE_FREQ = 10
-TRANSACTION_COST = 0
+LOOKBACK = 30
+REBALANCE_FREQ = 1
+TRANSACTION_COST = 0.005
 TOTAL_TIMESTEPS = 100000
 EVAL_FREQ = 5000
 TRAIN_START = "2006-01-01"
 TRAIN_END = "2016-12-31"
 VAL_START = "2017-01-01"
-VAL_END = "2019-12-31"
+VAL_END = "2021-12-31"
 MODEL = "SAC"
 
 # Mapeo de nombre de modelo a la clase correspondiente de SB3
