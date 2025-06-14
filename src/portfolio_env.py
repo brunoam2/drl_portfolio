@@ -98,11 +98,12 @@ class PortfolioEnv(gym.Env):
 
             turnover = np.sum(np.abs(new_weights - self.current_weights)) / 2.0
             cost = self.transaction_cost * turnover
-            self.history["turnovers"].append(turnover)
         else:
             new_weights = self.current_weights.copy()
             turnover = 0.0
             cost = 0.0
+
+        self.history["turnovers"].append(turnover)
 
         # Calcular retorno del portafolio
         asset_returns = []
