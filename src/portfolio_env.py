@@ -67,9 +67,11 @@ class PortfolioEnv(gym.Env):
 
         self.history = {
             "weights": [self.current_weights.copy()],
-            "accumulated_reward": [0.0],
+            "returns": [],
             "rewards": [],
+            "accumulated_reward": [0.0],
             "turnovers": [0.0],
+            "costs":[],
             "dates": [self.all_dates[self.current_step]],
         }
 
@@ -104,6 +106,7 @@ class PortfolioEnv(gym.Env):
             cost = 0.0
 
         self.history["turnovers"].append(turnover)
+        self.history["costs"].append(cost)
 
         # Calcular retorno del portafolio
         asset_returns = []
@@ -116,6 +119,7 @@ class PortfolioEnv(gym.Env):
         portfolio_return = np.dot(new_weights, asset_returns) - cost
         step_reward = np.log1p(portfolio_return)
 
+        self.history["returns"].append(asset_returns)
         self.history["rewards"].append(step_reward)
         cumulative = self.history["accumulated_reward"][-1] + step_reward
         self.history["accumulated_reward"].append(cumulative)
