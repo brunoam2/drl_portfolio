@@ -22,19 +22,20 @@ from src.evaluation import evaluate_performance
 
 # --- User parameters (edit these) ---
 LOOKBACK = 30
-REBALANCE_FREQ = 1
-TRANSACTION_COST = 0.005
-TOTAL_TIMESTEPS = 100000
+REBALANCE_FREQ = 5
+TRANSACTION_COST = 0.001
+TOTAL_TIMESTEPS = 150000
 EVAL_FREQ = 5000
 TRAIN_START = "2006-01-01"
 TRAIN_END = "2016-12-31"
 VAL_START = "2017-01-01"
 VAL_END = "2021-12-31"
-MODEL = "SAC"
+MODEL = "RecurrentPPO"
 
 # Mapeo de nombre de modelo a la clase correspondiente de SB3
-from stable_baselines3 import SAC, DDPG, TD3, PPO
-MODEL_MAP = {"SAC": SAC, "DDPG": DDPG, "TD3": TD3, "PPO": PPO}
+from stable_baselines3 import SAC,DDPG, TD3, PPO
+from sb3_contrib import RecurrentPPO
+MODEL_MAP = {"RecurrentPPO": RecurrentPPO, "SAC": SAC, "DDPG": DDPG, "TD3": TD3, "PPO": PPO}
 ModelClass = MODEL_MAP.get(MODEL)
 if ModelClass is None:
     raise ValueError(f"Algoritmo desconocido: {MODEL}")
@@ -71,7 +72,7 @@ def main():
     os.makedirs(results_dir, exist_ok=True)
 
     # Nombre de política y identificador del modelo
-    policy = "MlpPolicy"
+    policy = "MlpLstmPolicy"
     model_id = f"{MODEL}_{policy}_lb{LOOKBACK}_reb{REBALANCE_FREQ}_tc{TRANSACTION_COST}"
 
     # Mostrar parámetros de configuración
@@ -99,7 +100,7 @@ def main():
     print("-------------------------------")
 
     # Mostrar validación inicial
-    val_env = PortfolioEnv(df_val, LOOKBACK, REBALANCE_FREQ, TRANSACTION_COST, observation_mode="mlp")
+    val_env = PortfolioEnv(df_val, LOOKBACK, REBALANCE_FREQ, TRANSACTION_COST, observation_mode="rnn")
     model = ModelClass(policy, val_env, verbose=0)
     init_metrics = evaluate_agent(val_env, model)
 
@@ -111,7 +112,7 @@ def main():
     records.append({"step": 0, **init_metrics.to_dict()})
 
     # Entrenamiento con evaluaciones periódicas
-    train_env = PortfolioEnv(df_train, LOOKBACK, REBALANCE_FREQ, TRANSACTION_COST, observation_mode="mlp")
+    train_env = PortfolioEnv(df_train, LOOKBACK, REBALANCE_FREQ, TRANSACTION_COST, observation_mode="rnn")
     model = ModelClass(policy, train_env, verbose=0)
 
     best_return = -np.inf

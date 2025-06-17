@@ -5,8 +5,7 @@ import pandas as pd
 import gymnasium as gym
 from gymnasium import spaces
 
-from src.observation_builder import build_observation_mlp, build_observation_cnn
-
+from src.observation_builder import build_observation_mlp, build_observation_cnn, build_observation_rnn
 
 class PortfolioEnv(gym.Env):
     """
@@ -30,11 +29,12 @@ class PortfolioEnv(gym.Env):
         self.rebalance_freq = rebalance_freq
         self.transaction_cost = transaction_cost
 
-        self.observation_mode = observation_mode
         if observation_mode == "mlp":
             self.observation_builder = build_observation_mlp
         elif observation_mode == "cnn":
             self.observation_builder = build_observation_cnn
+        elif observation_mode == "rnn":
+            self.observation_builder = build_observation_rnn
         else:
             raise ValueError(f"Modo de observación desconocido: {observation_mode}")
 
@@ -42,7 +42,7 @@ class PortfolioEnv(gym.Env):
         self.n_assets = len(self.asset_names)
         self.all_dates = combined_data.index.to_list()
 
-        self.initial_weights = np.array([0.0, 0.0, 0.0, 1.0], dtype=float)
+        self.initial_weights = np.array([0.25, 0.25, 0.25, 0.25], dtype=float)
 
         self.reset()
         self.end_step = len(self.all_dates) - 1
@@ -96,7 +96,10 @@ class PortfolioEnv(gym.Env):
         # Determinar si es momento de rebalancear
         if step_index % self.rebalance_freq == 0:
             action = np.clip(action, 0, None)
-            new_weights = action / action.sum()
+            if np.sum(action) == 0:
+                new_weights = self.current_weights.copy()
+            else:
+                new_weights = action / np.sum(action)
 
             turnover = np.sum(np.abs(new_weights - self.current_weights)) / 2.0
             cost = self.transaction_cost * turnover

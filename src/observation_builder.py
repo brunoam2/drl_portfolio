@@ -41,3 +41,37 @@ def build_observation_mlp(combined_data, step, lookback, asset_names=None):
 
 def build_observation_cnn(combined_data, step, lookback, asset_names=None):
     return 
+
+def build_observation_rnn(combined_data, step, lookback, asset_names=None):
+    """
+    Construye la observación para una red RNN (como LSTM) usando una secuencia temporal de vectores multivariantes.
+    La salida es un array NumPy de forma (lookback, num_features).
+
+    - Datos incluidos:
+        SPY_LogReturn, SPY_RelativeSMA200, SPY_RSI14, SPY_Volatility21
+        GLD_LogReturn, GLD_RelativeSMA200, GLD_RSI14, GLD_Volatility21
+        TLT_LogReturn, TLT_RelativeSMA200, TLT_RSI14, TLT_Volatility21
+        DX_LogReturn, CPIAUCSL_LogReturn, FederalFundsRate_LogReturn
+    """
+    start = step - (lookback - 1)
+    window = combined_data.iloc[start:step+1]
+
+    cols = [
+        "SPY_LogReturn", "SPY_RelativeSMA200", "SPY_RSI14", "SPY_Volatility21",
+        "GLD_LogReturn", "GLD_RelativeSMA200", "GLD_RSI14", "GLD_Volatility21",
+        "TLT_LogReturn", "TLT_RelativeSMA200", "TLT_RSI14", "TLT_Volatility21",
+        "DX_LogReturn", "CPIAUCSL_LogReturn", "FederalFundsRate_LogReturn"
+    ]
+
+    # Normalización z-score
+    normed = []
+    for col in cols:
+        series = window[col]
+        mu = series.mean()
+        sigma = series.std()
+        normed.append(((series - mu) / (sigma if sigma != 0 else 1.0)).values)
+
+    # Transponer para obtener secuencia temporal por fila
+    obs = np.stack(normed, axis=1)  # (lookback, num_features)
+
+    return obs
