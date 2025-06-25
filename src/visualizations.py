@@ -5,11 +5,11 @@ import os
 # Ruta base de los archivos de métricas
 base_path = "results/model_training"
 files = {
-    "reb1_tc0": "SAC_MlpPolicy_lb30_reb1_tc0_metrics.csv",
-    "reb1_tc0.001": "SAC_MlpPolicy_lb30_reb1_tc0.001_metrics.csv",
-    "reb1_tc0.005":  "SAC_MlpPolicy_lb30_reb1_tc0.005_metrics.csv",
-    "reb1_tc0.0075":  "SAC_MlpPolicy_lb30_reb1_tc0.0075_metrics.csv",
-    "reb1_tc0.01":  "SAC_MlpPolicy_lb30_reb1_tc0.01_metrics.csv"
+    "PPO":  "PPO_MlpPolicy_lb60_reb10_tc0.001.csv",
+    "A2C":  "A2C_MlpPolicy_lb60_reb10_tc0.001.csv",
+    "DDPG": "DDPG_MlpPolicy_lb60_reb10_tc0.001.csv",
+    "TD3":  "TD3_MlpPolicy_lb60_reb10_tc0.001.csv",
+    "SAC":  "SAC_MlpPolicy_lb60_reb10_tc0.001.csv"
 }
 
 # Cargar todos los CSV en un diccionario

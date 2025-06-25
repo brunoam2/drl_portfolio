@@ -22,20 +22,22 @@ from src.evaluation import evaluate_performance
 
 # --- User parameters (edit these) ---
 LOOKBACK = 30
-REBALANCE_FREQ = 5
-TRANSACTION_COST = 0.001
-TOTAL_TIMESTEPS = 150000
+REBALANCE_FREQ = 1
+TRANSACTION_COST = 0
+TOTAL_TIMESTEPS = 200000
 EVAL_FREQ = 5000
 TRAIN_START = "2006-01-01"
 TRAIN_END = "2016-12-31"
 VAL_START = "2017-01-01"
 VAL_END = "2021-12-31"
-MODEL = "RecurrentPPO"
+MODEL = "SAC"
+POLICY = "MlpPolicy"
+OBSERVATION_MODE = "mlp"
 
 # Mapeo de nombre de modelo a la clase correspondiente de SB3
-from stable_baselines3 import SAC,DDPG, TD3, PPO
+from stable_baselines3 import SAC,DDPG, TD3, PPO, A2C
 from sb3_contrib import RecurrentPPO
-MODEL_MAP = {"RecurrentPPO": RecurrentPPO, "SAC": SAC, "DDPG": DDPG, "TD3": TD3, "PPO": PPO}
+MODEL_MAP = {"RecurrentPPO": RecurrentPPO, "SAC": SAC, "DDPG": DDPG, "TD3": TD3, "PPO": PPO, "A2C":A2C}
 ModelClass = MODEL_MAP.get(MODEL)
 if ModelClass is None:
     raise ValueError(f"Algoritmo desconocido: {MODEL}")
@@ -46,10 +48,15 @@ def load_data(path, start, end):
 
 def evaluate_agent(env, model):
     obs, _ = env.reset()
+    state = None
     done = False
+    episode_start = True
+
     while not done:
-        action, _ = model.predict(obs, deterministic=True)
+        action, state = model.predict(obs, state=state, episode_start=episode_start, deterministic=True)
         obs, reward, done, _, info = env.step(action)
+        episode_start = done  # reinicia el estado oculto si termina el episodio
+
     returns = pd.Series(env.history["rewards"])
     turnovers = pd.Series(env.history["turnovers"])
     cumulative_returns = pd.Series(env.history["accumulated_reward"])
@@ -72,8 +79,7 @@ def main():
     os.makedirs(results_dir, exist_ok=True)
 
     # Nombre de política y identificador del modelo
-    policy = "MlpLstmPolicy"
-    model_id = f"{MODEL}_{policy}_lb{LOOKBACK}_reb{REBALANCE_FREQ}_tc{TRANSACTION_COST}"
+    model_id = f"{MODEL}_{POLICY}_lb{LOOKBACK}_reb{REBALANCE_FREQ}_tc{TRANSACTION_COST}"
 
     # Mostrar parámetros de configuración
     print("=== Parámetros de configuración ===")
@@ -100,8 +106,8 @@ def main():
     print("-------------------------------")
 
     # Mostrar validación inicial
-    val_env = PortfolioEnv(df_val, LOOKBACK, REBALANCE_FREQ, TRANSACTION_COST, observation_mode="rnn")
-    model = ModelClass(policy, val_env, verbose=0)
+    val_env = PortfolioEnv(df_val, LOOKBACK, REBALANCE_FREQ, TRANSACTION_COST, observation_mode=OBSERVATION_MODE)
+    model = ModelClass(POLICY, val_env, verbose=0)
     init_metrics = evaluate_agent(val_env, model)
 
     print("=== Validación inicial (modelo sin entrenar) ===")
@@ -112,8 +118,8 @@ def main():
     records.append({"step": 0, **init_metrics.to_dict()})
 
     # Entrenamiento con evaluaciones periódicas
-    train_env = PortfolioEnv(df_train, LOOKBACK, REBALANCE_FREQ, TRANSACTION_COST, observation_mode="rnn")
-    model = ModelClass(policy, train_env, verbose=0)
+    train_env = PortfolioEnv(df_train, LOOKBACK, REBALANCE_FREQ, TRANSACTION_COST, observation_mode=OBSERVATION_MODE)
+    model = ModelClass(POLICY, train_env, verbose=0)
 
     best_return = -np.inf
     start_time = time.time()
@@ -141,7 +147,7 @@ def main():
 
     # Guardado de métricas
     df_records = pd.DataFrame(records)
-    df_records.to_csv(os.path.join(results_dir, f"{model_id}_metrics.csv"), index=False)
+    df_records.to_csv(os.path.join(results_dir, f"{model_id}.csv"), index=False)
 
     # Informar ubicaciones
     print(f"Training time (s): {elapsed:.1f}")

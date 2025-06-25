@@ -3,7 +3,7 @@ from datetime import timedelta
 import sys
 import pandas as pd
 
-# Añadimos el project root al path para que `import src` funcione
+# Se añade el project root al path para que `import src` funcione
 PROJECT_ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -13,7 +13,7 @@ from src.data import get_combined_dataset
 TICKERS      = ["SPY", "TLT", "GLD"]
 DATA_START   = "2006-01-01"
 DATA_END     = "2024-12-31"
-FRED_API_KEY = "14f7d5dc732ec05d73eab8ab21852b5a"
+FRED_API_KEY = "tu_clave_fred_api"  # Reemplazar con tu clave de API de FRED
 
 # Directorio de salida
 OUT_DIR = Path(__file__).parents[1] / "datasets"

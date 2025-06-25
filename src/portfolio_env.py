@@ -51,11 +51,13 @@ class PortfolioEnv(gym.Env):
             combined_data=self.combined_data,
             step=self.current_step,
             lookback=self.lookback,
-            asset_names=self.asset_names,
+            current_weights = self.current_weights, 
         )
         obs_shape = sample_obs.shape
 
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=obs_shape, dtype=np.float32)
+        low = 0.0 if observation_mode == "cnn" else -np.inf
+        high = 1.0 if observation_mode == "cnn" else np.inf
+        self.observation_space = spaces.Box(low=low, high=high, shape=obs_shape, dtype=np.float32)
         self.action_space = spaces.Box(low=0.0, high=1.0, shape=(self.n_assets,), dtype=np.float32)
 
     def reset(self, **kwargs):
@@ -81,7 +83,7 @@ class PortfolioEnv(gym.Env):
             combined_data=self.combined_data,
             step=self.current_step,
             lookback=self.lookback,
-            asset_names=self.asset_names,
+            current_weights = self.current_weights, 
         )
         return obs, {}
 
@@ -89,11 +91,10 @@ class PortfolioEnv(gym.Env):
         """
         Avanza un paso en el entorno, calcula recompensa y siguiente observación.
         """
+        # Determinar si es momento de rebalancear
         step_index = self.current_step - (self.lookback - 1)
         date = self.all_dates[self.current_step]
-        asset_returns = []
 
-        # Determinar si es momento de rebalancear
         if step_index % self.rebalance_freq == 0:
             action = np.clip(action, 0, None)
             if np.sum(action) == 0:
@@ -110,6 +111,17 @@ class PortfolioEnv(gym.Env):
 
         self.history["turnovers"].append(turnover)
         self.history["costs"].append(cost)
+
+        # Advance to next step and check termination
+        self.current_step += 1
+        if self.current_step > self.end_step:
+            self.current_step = self.end_step
+            self.done = True
+
+        # Recompute date and step_index for new step
+        date = self.all_dates[self.current_step]
+        self.history["dates"].append(date)
+        step_index = self.current_step - (self.lookback - 1)
 
         # Calcular retorno del portafolio
         asset_returns = []
@@ -134,18 +146,14 @@ class PortfolioEnv(gym.Env):
         self.current_weights = drifted_weights.copy()
         self.history["weights"].append(self.current_weights.copy())
         
-        # Actualizar paso y verificar si se ha alcanzado el final
-        self.history["dates"].append(date)
-        self.current_step += 1
-        if self.current_step > self.end_step:
-            self.done = True
+        
 
         if not self.done:
             obs = self.observation_builder(
                 combined_data=self.combined_data,
                 step=self.current_step,
                 lookback=self.lookback,
-                asset_names=self.asset_names,
+                current_weights = self.current_weights,
             )
         else:
             obs = None

@@ -1,23 +1,16 @@
-
-
 import numpy as np
 
-def build_observation_mlp(combined_data, step, lookback, asset_names=None):
-    """
-    Construye la observación para una red MLP usando:
-    - SPY_LogReturn
-    - TLT_LogReturn
-    - GLD_LogReturn
-    - SPY_RelativeSMA200
-    - DX_Return
-    La salida es un array NumPy de forma (5, lookback).
-    """
-    # Índice de inicio de la ventana
+def zscore_normalize(series):
+    """Normaliza una serie usando z-score."""
+    mu = series.mean()
+    sigma = series.std()
+    return (series - mu) / (sigma if sigma != 0 else 1.0)
+
+def build_observation_mlp(combined_data, step, lookback, current_weights=None):
+    """Construye la observación para una red MLP con características normalizadas y pesos opcionales."""
     start = step - (lookback - 1)
-    # Selección de la ventana de datos
     window = combined_data.iloc[start:step+1]
 
-    # Lista de columnas a usar
     cols = [
         "SPY_LogReturn", "SPY_RelativeSMA200", "SPY_RSI14", "SPY_Volatility21",
         "GLD_LogReturn", "GLD_RelativeSMA200", "GLD_RSI14", "GLD_Volatility21",
@@ -25,34 +18,22 @@ def build_observation_mlp(combined_data, step, lookback, asset_names=None):
         "DX_LogReturn", "CPIAUCSL_LogReturn", "FederalFundsRate_LogReturn"
     ]
 
-    # Normalización z-score por columna (ventana)
     normed = {}
     for col in cols:
-        series = window[col]
-        mu = series.mean()
-        sigma = series.std()
-        # Evitar división por cero
-        normed[col] = (series - mu) / (sigma if sigma != 0 else 1.0)
+        normed[col] = zscore_normalize(window[col])
 
-    # Concatenar todas las columnas normalizadas en un vector 1D
     obs = np.concatenate([normed[col].values for col in cols])
+
+    if current_weights is not None:
+        obs = np.concatenate([obs, current_weights])
 
     return obs
 
-def build_observation_cnn(combined_data, step, lookback, asset_names=None):
+def build_observation_cnn(combined_data, step, lookback):
     return 
 
-def build_observation_rnn(combined_data, step, lookback, asset_names=None):
-    """
-    Construye la observación para una red RNN (como LSTM) usando una secuencia temporal de vectores multivariantes.
-    La salida es un array NumPy de forma (lookback, num_features).
-
-    - Datos incluidos:
-        SPY_LogReturn, SPY_RelativeSMA200, SPY_RSI14, SPY_Volatility21
-        GLD_LogReturn, GLD_RelativeSMA200, GLD_RSI14, GLD_Volatility21
-        TLT_LogReturn, TLT_RelativeSMA200, TLT_RSI14, TLT_Volatility21
-        DX_LogReturn, CPIAUCSL_LogReturn, FederalFundsRate_LogReturn
-    """
+def build_observation_rnn(combined_data, step, lookback, current_weights=None):
+    """Construye la observación para una red RNN con características normalizadas y pesos opcionales."""
     start = step - (lookback - 1)
     window = combined_data.iloc[start:step+1]
 
@@ -63,15 +44,14 @@ def build_observation_rnn(combined_data, step, lookback, asset_names=None):
         "DX_LogReturn", "CPIAUCSL_LogReturn", "FederalFundsRate_LogReturn"
     ]
 
-    # Normalización z-score
     normed = []
     for col in cols:
-        series = window[col]
-        mu = series.mean()
-        sigma = series.std()
-        normed.append(((series - mu) / (sigma if sigma != 0 else 1.0)).values)
+        normed.append(zscore_normalize(window[col]).values)
 
-    # Transponer para obtener secuencia temporal por fila
     obs = np.stack(normed, axis=1)  # (lookback, num_features)
+
+    if current_weights is not None:
+        weights_channel = np.tile(current_weights, (lookback, 1))
+        obs = np.concatenate([obs, weights_channel], axis=1)
 
     return obs

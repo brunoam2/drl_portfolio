@@ -22,7 +22,7 @@ def compute_technical_indicators(price_df):
         log_return = np.log(price_series / price_series.shift(1))
         indicator_df[f"{ticker}_LogReturn"] = log_return
 
-        # Retornos lineales (aritméticos) diarios
+        # Retornos lineales (aritméticos)
         arith_return = price_series.pct_change()
         indicator_df[f"{ticker}_Return"] = arith_return
 
@@ -56,9 +56,9 @@ def download_macroeconomic_data(fred_api_key, start_date, end_date, reference_in
     ]
 
     for symbol, column_name in macro_series:
-        orig_series = fred_client.get_series(symbol, observation_start=start_date, observation_end=end_date)
+        original_series = fred_client.get_series(symbol, observation_start=start_date, observation_end=end_date)
         # Guardar valor raw
-        raw = orig_series.reindex(reference_index).ffill()
+        raw = original_series.reindex(reference_index).ffill()
         macro_df[f"{column_name}_Raw"] = raw
 
         # Retorno aritmético diario, con 0 explícito para días sin cambio o sin datos previos

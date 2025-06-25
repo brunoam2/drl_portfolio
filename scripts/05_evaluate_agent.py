@@ -16,8 +16,8 @@ from stable_baselines3 import SAC
 
 # === CONFIGURATION (match training) ===
 LOOKBACK = 30
-REBALANCE_FREQ = 3
-TRANSACTION_COST = 0.001
+REBALANCE_FREQ = 10
+TRANSACTION_COST = 0
 
 def evaluate_agent(env, model):
     """Run the agent through env and collect history, then compute metrics."""
@@ -37,7 +37,7 @@ def evaluate_agent(env, model):
 
 def main():
     data_path = "datasets/combined_data.csv"
-    model_path = "models/SAC_MlpPolicy_lb30_reb3_tc0.001.zip"
+    model_path = "models/SAC_MlpPolicy_lb30_reb10_tc0.zip"
     start_date = "2022-01-01"
     end_date = "2024-01-01"
 
@@ -70,10 +70,9 @@ def main():
 
     # save metrics and weights
     os.makedirs("results", exist_ok=True)
-    metrics.to_frame("value").to_csv("results/eval_metrics_2019_2024.csv")
-    df_weights.to_csv("results/eval_weights_2019_2024.csv")
-    pd.Series(cumulative_costs.values, index=dates[1:], name="cumulative_costs").to_frame().to_csv("results/eval_cumulative_costs_2019_2024.csv")
-    pd.Series(portfolio_value, index=dates, name="portfolio_value").to_csv("results/eval_portfolio_value_2019_2024.csv")
+    metrics.to_frame("value").to_csv("results/model_evaluation/eval_metrics_2022_2024.csv")
+    df_weights.to_csv("results/model_evaluation/eval_weights_2022_2024.csv")
+    pd.Series(cumulative_costs.values, index=dates[1:], name="cumulative_costs").to_frame().to_csv("results/model_evaluation/eval_cumulative_costs_2022_2024.csv")
 
     returns = pd.Series(env.history["rewards"])
     transaction_costs = pd.Series(env.history.get("costs", []))
@@ -88,7 +87,7 @@ def main():
         "transaction_cost": transaction_costs,
         "reward_minus_cost": returns - transaction_costs
     })
-    df_daily.to_csv("results/reward_and_transaction_cost_2019_2024.csv")
+    df_daily.to_csv("results/model_evaluation/reward_and_transaction_cost_2022_2024.csv")
 
     # plot weight evolution
     plt.figure(figsize=(10, 6))
@@ -99,19 +98,19 @@ def main():
     plt.ylabel("Weight")
     plt.legend()
     plt.tight_layout()
-    plt.savefig("results/weights_evolution_2022_2024.png")
+    plt.savefig("results/model_evaluation/weights_evolution_2022_2024.png")
     plt.show()
 
     # plot cumulative transaction costs and portfolio value
     plt.figure(figsize=(10, 6))
     plt.plot(dates[1:], cumulative_costs, label="Cumulative Transaction Costs")
     plt.plot(dates, portfolio_value, label="Portfolio Value (exp of cumulative log-returns)")
-    plt.title("Portfolio Value and Transaction Costs 2019-2024")
+    plt.title("Portfolio Value and Transaction Costs 2022-2024")
     plt.xlabel("Date")
     plt.ylabel("Value")
     plt.legend()
     plt.tight_layout()
-    plt.savefig("results/value_and_costs_2019_2024.png")
+    plt.savefig("results/model_evaluation/value_and_costs_2022_2024.png")
     plt.show()
 
     # plot cumulative daily return and cumulative transaction cost
@@ -126,7 +125,7 @@ def main():
     plt.ylabel("Cumulative Value")
     plt.legend()
     plt.tight_layout()
-    plt.savefig("results/cumulative_return_vs_cost_2019_2024.png")
+    plt.savefig("results/model_evaluation/cumulative_return_vs_cost_2022_2024.png")
     plt.show()
 
 if __name__ == "__main__":
