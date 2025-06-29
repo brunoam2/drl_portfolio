@@ -18,20 +18,24 @@ def compute_technical_indicators(price_df):
         price_series = price_df[ticker]
         indicator_df = pd.DataFrame(index=price_series.index)
 
+        # Retornos aritméticos
+        returns = price_series.pct_change().fillna(0)
+        indicator_df[f"{ticker}_Return"] = returns
+
         # Retornos logarítmicos
         log_return = np.log(price_series / price_series.shift(1))
         indicator_df[f"{ticker}_LogReturn"] = log_return
 
-        # Retornos lineales (aritméticos)
-        arith_return = price_series.pct_change()
-        indicator_df[f"{ticker}_Return"] = arith_return
+        # Diferencia porcentual SMA50
+        sma_50 = price_series.rolling(window=50, min_periods=50).mean()
+        indicator_df[f"{ticker}_RelativeSMA50"] = (price_series - sma_50) / sma_50
 
-        # Diferencia porcentual SMA200
-        sma_200 = price_series.rolling(window=200, min_periods=200).mean()
-        indicator_df[f"{ticker}_RelativeSMA200"] = (price_series - sma_200) / sma_200
+        # Diferencia porcentual SMA21
+        sma_21 = price_series.rolling(window=21, min_periods=21).mean()
+        indicator_df[f"{ticker}_RelativeSMA21"] = (price_series - sma_21) / sma_21
 
-        # RSI14 normalizado
-        rsi_14 = ta.momentum.RSIIndicator(close=price_series, window=14).rsi() / 100.0
+        # RSI14
+        rsi_14 = ta.momentum.RSIIndicator(close=price_series, window=14).rsi()
         indicator_df[f"{ticker}_RSI14"] = rsi_14
 
         # VOL21 volatilidad histórica
@@ -44,7 +48,7 @@ def compute_technical_indicators(price_df):
 
 
 def download_macroeconomic_data(fred_api_key, start_date, end_date, reference_index):
-    """Descargar datos macroeconómicos diarios (raw, aritméticos y logarítmicos): CPI, GDPC1, FEDFUNDS, VIX, DX."""
+    """Descargar datos macroeconómicos diarios: valores originales y versiones forward-filled de CPI, FEDFUNDS y DX."""
     fred_client = Fred(api_key=fred_api_key)
     macro_df = pd.DataFrame(index=reference_index)
 
@@ -57,19 +61,9 @@ def download_macroeconomic_data(fred_api_key, start_date, end_date, reference_in
 
     for symbol, column_name in macro_series:
         original_series = fred_client.get_series(symbol, observation_start=start_date, observation_end=end_date)
-        # Guardar valor raw
-        raw = original_series.reindex(reference_index).ffill()
-        macro_df[f"{column_name}_Raw"] = raw
-
-        # Retorno aritmético diario, con 0 explícito para días sin cambio o sin datos previos
-        arith = raw.pct_change().fillna(0)
-        macro_df[f"{column_name}_Return"] = arith
-
-        # Retorno logarítmico diario, también rellenando NaN con 0
-        log = np.log1p(arith).fillna(0)
-        macro_df[f"{column_name}_LogReturn"] = log
-        continue
-
+                # Guardar solo la versión forward-filled
+        raw = original_series.reindex(reference_index)
+        macro_df[f"{column_name}_Filled"] = raw.ffill()
     return macro_df
 
 
@@ -80,3 +74,8 @@ def get_combined_dataset(tickers, start_date, end_date, fred_api_key):
     macro_df = download_macroeconomic_data(fred_api_key, start_date, end_date, price_df.index)
     combined_df = pd.concat([price_df, tech_df, macro_df], axis=1).dropna()
     return combined_df
+
+
+def load_price_data(filepath, start_date, end_date):
+    df = pd.read_csv(filepath, index_col=0, parse_dates=True)
+    return df[(df.index >= start_date) & (df.index <= end_date)]

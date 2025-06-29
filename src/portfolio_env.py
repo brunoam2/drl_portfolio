@@ -5,13 +5,12 @@ import pandas as pd
 import gymnasium as gym
 from gymnasium import spaces
 
-from src.observation_builder import build_observation_mlp, build_observation_cnn, build_observation_rnn
+from src.observation_builder import build_observation_mlp
 
 class PortfolioEnv(gym.Env):
     """
-    Entorno de cartera para SPY, TLT, GLD y CASH.
-    observation_mode puede ser "mlp" o "cnn" para usar el builder correspondiente.
-    Recompensa = log-return portafolio − coste.
+    Entorno personalizado de Gym para simular una cartera de inversión con activos SPY, TLT, GLD y liquidez (CASH).
+    Utiliza una representación MLP de observación. La recompensa se define como el log-retorno neto de la cartera.
     """
 
     def __init__(
@@ -20,7 +19,6 @@ class PortfolioEnv(gym.Env):
         lookback: int,
         rebalance_freq: int,
         transaction_cost: float,
-        observation_mode: str = "mlp",
     ):
         super().__init__()
 
@@ -29,14 +27,7 @@ class PortfolioEnv(gym.Env):
         self.rebalance_freq = rebalance_freq
         self.transaction_cost = transaction_cost
 
-        if observation_mode == "mlp":
-            self.observation_builder = build_observation_mlp
-        elif observation_mode == "cnn":
-            self.observation_builder = build_observation_cnn
-        elif observation_mode == "rnn":
-            self.observation_builder = build_observation_rnn
-        else:
-            raise ValueError(f"Modo de observación desconocido: {observation_mode}")
+        self.observation_builder = build_observation_mlp
 
         self.asset_names = ["SPY", "TLT", "GLD", "CASH"]
         self.n_assets = len(self.asset_names)
@@ -55,23 +46,21 @@ class PortfolioEnv(gym.Env):
         )
         obs_shape = sample_obs.shape
 
-        low = 0.0 if observation_mode == "cnn" else -np.inf
-        high = 1.0 if observation_mode == "cnn" else np.inf
-        self.observation_space = spaces.Box(low=low, high=high, shape=obs_shape, dtype=np.float32)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=obs_shape, dtype=np.float32)
         self.action_space = spaces.Box(low=0.0, high=1.0, shape=(self.n_assets,), dtype=np.float32)
 
     def reset(self, **kwargs):
         """
-        Reinicia entorno y devuelve la observación inicial.
+        Reinicia el entorno y devuelve la observación inicial.
         """
         self.current_step = self.lookback - 1
         self.current_weights = self.initial_weights.copy()
 
         self.history = {
             "weights": [self.current_weights.copy()],
-            "returns": [],
+            "portfolio_net_returns": [],
             "rewards": [],
-            "accumulated_reward": [0.0],
+            "accumulated_rewards": [0.0],
             "turnovers": [0.0],
             "costs":[],
             "dates": [self.all_dates[self.current_step]],
@@ -89,19 +78,13 @@ class PortfolioEnv(gym.Env):
 
     def step(self, action):
         """
-        Avanza un paso en el entorno, calcula recompensa y siguiente observación.
+        Avanza un paso en el entorno, calcula la recompensa y genera la siguiente observación.
         """
-        # Determinar si es momento de rebalancear
-        step_index = self.current_step - (self.lookback - 1)
-        date = self.all_dates[self.current_step]
 
-        if step_index % self.rebalance_freq == 0:
+        # Tomar la decisión de rebalanceo cada `rebalance_freq` pasos
+        if (self.current_step - (self.lookback - 1)) % self.rebalance_freq == 0:
             action = np.clip(action, 0, None)
-            if np.sum(action) == 0:
-                new_weights = self.current_weights.copy()
-            else:
-                new_weights = action / np.sum(action)
-
+            new_weights = action / np.sum(action) if np.sum(action) > 0 else self.current_weights.copy()
             turnover = np.sum(np.abs(new_weights - self.current_weights)) / 2.0
             cost = self.transaction_cost * turnover
         else:
@@ -112,18 +95,17 @@ class PortfolioEnv(gym.Env):
         self.history["turnovers"].append(turnover)
         self.history["costs"].append(cost)
 
-        # Advance to next step and check termination
+        # Actualizar el paso actual y verificar si se ha alcanzado el final
         self.current_step += 1
         if self.current_step > self.end_step:
             self.current_step = self.end_step
             self.done = True
 
-        # Recompute date and step_index for new step
         date = self.all_dates[self.current_step]
         self.history["dates"].append(date)
         step_index = self.current_step - (self.lookback - 1)
 
-        # Calcular retorno del portafolio
+        # Calcular retorno bruto del portafolio como suma ponderada de retornos de activos
         asset_returns = []
         for asset in self.asset_names:
             if asset == "CASH":
@@ -131,23 +113,23 @@ class PortfolioEnv(gym.Env):
             else:
                 asset_returns.append(self.combined_data.loc[date, f"{asset}_Return"])
         asset_returns = np.array(asset_returns)
-        portfolio_return = np.dot(new_weights, asset_returns) - cost
-        step_reward = np.log1p(portfolio_return)
+        portfolio_gross_return = np.dot(new_weights, asset_returns)
+        portfolio_net_return = portfolio_gross_return - cost
+        step_reward = np.log1p(portfolio_net_return)
 
-        self.history["returns"].append(asset_returns)
+        self.history["portfolio_net_returns"].append(portfolio_gross_return)
         self.history["rewards"].append(step_reward)
-        cumulative = self.history["accumulated_reward"][-1] + step_reward
-        self.history["accumulated_reward"].append(cumulative)
+        accumulated_rewards = np.sum(self.history["rewards"])
+        self.history["accumulated_rewards"].append(accumulated_rewards)
 
-        # Aplicar drift de mercado: ajustar pesos según el retorno de cada activo
+        # Ajustar pesos según retorno de activos para reflejar evolución del portafolio (drift)
         drifted_weights = new_weights * (1 + asset_returns)
         drifted_weights = drifted_weights / drifted_weights.sum()
 
         self.current_weights = drifted_weights.copy()
         self.history["weights"].append(self.current_weights.copy())
         
-        
-
+        # Construir la observación para el siguiente paso
         if not self.done:
             obs = self.observation_builder(
                 combined_data=self.combined_data,
@@ -161,7 +143,7 @@ class PortfolioEnv(gym.Env):
         info = {
             "date" : date,
             "reward": step_reward,
-            "accumulated_reward": cumulative,
+            "accumulated_rewards": accumulated_rewards,
             "weights": self.current_weights.copy(),
             "turnover": turnover,
             "transaction_cost": cost,

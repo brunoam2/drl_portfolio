@@ -1,79 +1,100 @@
 import os
-import sys
-from pathlib import Path
+os.makedirs("results/explore_data", exist_ok=True)
+
 import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+import numpy as np
+import matplotlib.dates as mdates
 
-# Añadimos el project root al path para que `import src` funcione
-PROJECT_ROOT = Path(__file__).parents[1]
-sys.path.insert(0, str(PROJECT_ROOT))
+mpl.rcParams.update({
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "axes.edgecolor": "gray",
+    "axes.labelsize": 12,
+    "axes.titlesize": 14,
+    "legend.fontsize": 10,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "grid.color": "gray",
+    "grid.linestyle": "--",
+    "grid.alpha": 0.6
+})
 
-INPUT_DIR = "datasets"
-OUTPUT_DIR = "results/explore_data"
+df = pd.read_csv("datasets/combined_data.csv", index_col=0, parse_dates=True)
+assets = ['SPY', 'TLT', 'GLD']
 
-data = pd.read_csv(os.path.join(INPUT_DIR, "combined_data.csv"), index_col=0, parse_dates=True)
-
-numeric_data = data.select_dtypes(include=["number"])
-
-# Variables de activos
-asset_vars = [c for c in numeric_data.columns if any(c.startswith(t) for t in ["SPY", "TLT", "GLD"])]
-
-# Subgrupos técnicos
-logret_vars  = [c for c in asset_vars if c.endswith("_LogReturn")]
-arithret_vars= [c for c in asset_vars if c.endswith("_Return")]
-sma_vars     = [c for c in asset_vars if c.endswith("_RelSMA200")]
-rsi_vars     = [c for c in asset_vars if c.endswith("_RSI14")]
-vol_vars     = [c for c in asset_vars if c.endswith("_Vol21")]
-
-#
-# Definir variables log-retornos de activos
-logret_vars = [
-    c for c in numeric_data.columns
-    if c.endswith("_LogReturn") and c.split("_")[0] in ("SPY", "TLT", "GLD")
-]
-
-# Definir variables macro (excluye todo lo que comience con ticker de activos o sea nombre exacto de ticker)
-macro_vars = [
-    c for c in numeric_data.columns
-    if c not in logret_vars
-    and not any(c == pref or c.startswith(pref + "_") for pref in ("SPY", "TLT", "GLD"))
-]
-
-# Estadísticas descriptivas para todas las variables numéricas
-numeric_data.describe().to_csv(os.path.join(OUTPUT_DIR, "describe_all.csv"))
-
-# Matrices de correlación y gráficos
-
-# Matriz de correlación global de todas las variables numéricas
-corr_all = numeric_data.corr()
-corr_all.to_csv(os.path.join(OUTPUT_DIR, "corr_all.csv"))
-plt.figure(figsize=(12,10))
-sns.heatmap(corr_all, annot=False, cmap="coolwarm")
-plt.title("Correlación global de variables")
+df[assets].plot(figsize=(12, 6), grid=True, linewidth=1.5)
+ax = plt.gca()
+ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+plt.xticks(rotation=30)
+plt.title("Evolución de precios de cierre")
+plt.ylabel("Precio")
+plt.xlabel("Fecha")
+# plt.grid(True, axis="y", linestyle="--", alpha=0.5)
+plt.legend(loc='upper left', frameon=True)
 plt.tight_layout()
-plt.savefig(os.path.join(OUTPUT_DIR, "corr_all.png"))
+plt.savefig("results/explore_data/price_evolution.png")
 plt.close()
 
-# Correlación cruzada entre la media de LogReturns de activos y variables macro
-logret_vars = [
-    c for c in numeric_data.columns
-    if c.endswith("_LogReturn") and c.split("_")[0] in ("SPY", "TLT", "GLD")
-]
-macro_vars = [
-    c for c in numeric_data.columns
-    if c not in logret_vars and not any(c.startswith(pref + "_") for pref in ("SPY", "TLT", "GLD"))
-]
-
-asset_mean = numeric_data[logret_vars].mean(axis=1)
-cross_corr = numeric_data[macro_vars].apply(lambda col: asset_mean.corr(col))
-cross_corr.to_csv(os.path.join(OUTPUT_DIR, "corr_asset_macro.csv"))
-
-plt.figure(figsize=(10,6))
-cross_corr.plot(kind='bar')
-plt.title("Correlación Cruzada entre media de LogReturns de activos y Variables Macro")
-plt.ylabel("Correlación")
-plt.xticks(rotation=45, ha="right")
+arith_returns = df[assets].pct_change().fillna(0)
+(1 + arith_returns).cumprod().plot(figsize=(12, 6), grid=True, linewidth=1.5)
+ax = plt.gca()
+ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+plt.xticks(rotation=30)
+plt.title("Retornos aritméticos acumulados")
+plt.ylabel("Crecimiento acumulado")
+plt.xlabel("Fecha")
+# plt.grid(True, axis="y", linestyle="--", alpha=0.5)
+plt.legend(loc='upper left', frameon=True)
 plt.tight_layout()
-plt.savefig(os.path.join(OUTPUT_DIR, "corr_asset_macro.png"))
+plt.savefig("results/explore_data/arith_returns_cumprod.png")
+plt.close()
+
+log_returns = np.log(df[assets] / df[assets].shift(1)).fillna(0)
+log_returns.cumsum().plot(figsize=(12, 6), grid=True, linewidth=1.5)
+ax = plt.gca()
+ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+plt.xticks(rotation=30)
+plt.title("Retornos logarítmicos acumulados")
+plt.ylabel("Log-rendimiento acumulado")
+plt.xlabel("Fecha")
+# plt.grid(True, axis="y", linestyle="--", alpha=0.5)
+plt.legend(loc='upper left', frameon=True)
+plt.tight_layout()
+plt.savefig("results/explore_data/log_returns_cumsum.png")
+plt.close()
+
+
+
+
+# Gráficos individuales de indicadores macroeconómicos
+plt.figure(figsize=(6, 5))
+plt.plot(df.index, df["CPIAUCSL_Filled"], label="CPI (Filled)", color="tab:blue")
+plt.title("Evolución del CPI")
+plt.xlabel("Fecha")
+plt.ylabel("Índice de precios")
+plt.xticks(rotation=30)
+plt.tight_layout()
+plt.savefig("results/explore_data/cpi_evolucion.png", dpi=300)
+plt.close()
+
+plt.figure(figsize=(6, 5))
+plt.plot(df.index, df["FederalFundsRate_Filled"], label="Tipo de interés (Fed Funds)", color="tab:orange")
+plt.title("Evolución del tipo de interés de la Fed")
+plt.xlabel("Fecha")
+plt.ylabel("Tasa (%)")
+plt.xticks(rotation=30)
+plt.tight_layout()
+plt.savefig("results/explore_data/fedfunds_evolucion.png", dpi=300)
+plt.close()
+
+plt.figure(figsize=(6, 5))
+plt.plot(df.index, df["DX_Filled"], label="Índice Dólar (DX)", color="tab:green")
+plt.title("Evolución del índice del dólar (DX)")
+plt.xlabel("Fecha")
+plt.ylabel("Índice")
+plt.xticks(rotation=30)
+plt.tight_layout()
+plt.savefig("results/explore_data/dx_evolucion.png", dpi=300)
 plt.close()
