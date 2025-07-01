@@ -26,8 +26,11 @@ results_dir = os.path.join(PROJECT_ROOT, "results")
 os.makedirs(results_dir, exist_ok=True)
 
 # Crear entorno para todo el rango de datos
-env = PortfolioEnv(combined_data=combined_data, lookback=60, rebalance_freq=10, transaction_cost=0.001, seed="None", observation_mode="mlp")
+env = PortfolioEnv(combined_data=combined_data, lookback=60, rebalance_freq=10, transaction_cost=0.001)
 
+print("Probando el entorno...")
+
+portfolio_curves = {}
 for name, weights in baseline_policies.items():
     obs, _ = env.reset()
     done = False
@@ -36,20 +39,22 @@ for name, weights in baseline_policies.items():
 
     while not done:
         obs, reward, terminated, truncated, info = env.step(weights)
-        cumulative_rewards.append(info["accumulated_reward"])
+        cumulative_rewards.append(info["accumulated_rewards"])
         dates.append(env.history["dates"][-1])
         done = terminated or truncated
 
     portfolio_values = np.exp(cumulative_rewards)
+    portfolio_curves[name] = portfolio_values
 
-    print(f"Baseline: {name}")
-    print(f"Fecha inicio: {dates[0]}")
-    print(f"Fecha fin: {dates[-1]}")
-    plt.figure(figsize=(10, 6))
-    plt.plot(dates, portfolio_values)
-    plt.title(f"Valor del portafolio - {name}")
-    plt.xlabel("Fecha")
-    plt.ylabel("Valor del portafolio")
-    plt.grid(True)
-    plt.savefig(os.path.join(results_dir, f"{name}_portfolio.png"))
-    plt.close()
+# Mostrar todos los resultados en un solo gráfico
+plt.figure(figsize=(10, 6))
+for name, values in portfolio_curves.items():
+    plt.plot(dates, values, label=name)
+plt.title("Valor del portafolio - estrategias baseline")
+plt.xlabel("Fecha")
+plt.ylabel("Valor del portafolio")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+print("Prueba finalizada.")

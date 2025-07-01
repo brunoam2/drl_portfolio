@@ -5,9 +5,10 @@ import os
 # Ruta base de los archivos de métricas
 base_path = "results/model_training"
 files = {
-    "SAC_lb30_reb10_tc0_LeakyReLU": "SAC_lb30_reb10_tc0_LeakyReLU.csv",
-    "SAC_lb30_reb10_tc0_Tanh": "SAC_lb30_reb10_tc0_Tanh.csv",
-    "SAC_lb30_reb10_tc0": "SAC_lb30_reb10_tc0.csv"
+    "SAC_ct0" : "SAC_lb30_reb1_tc0.csv",
+    "SAC_ct0.001" : "SAC_lb30_reb1_tc0.001.csv",
+    "SAC_ct0.0025" : "SAC_lb30_reb1_tc0.0025.csv",
+    "SAC_ct0.005" : "SAC_lb30_reb1_tc0.005.csv"
 }
 
 # Cargar todos los CSV en un diccionario

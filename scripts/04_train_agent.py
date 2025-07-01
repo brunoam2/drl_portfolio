@@ -26,12 +26,12 @@ VAL_START = "2017-01-01"
 VAL_END = "2021-12-31"
 
 # Identificador del modelo con formato estándar
-MODEL_ID = "SAC_lb30_reb10_tc0_LeakyReLU,"
+MODEL_ID = "SAC_lb30_reb1_tc0"
 
 # Otros parámetros
 TOTAL_TIMESTEPS = 150000
 EVAL_FREQ = 5000
-SEED = 69
+SEED = 28
 
 # Establecer la semilla global
 random.seed(SEED)
