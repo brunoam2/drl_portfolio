@@ -1,96 +1,87 @@
 # Optimización de carteras con aprendizaje por refuerzo profundo (DRL)
 
-Este proyecto implementa un sistema de gestión de carteras financieras mediante aprendizaje por refuerzo profundo, entrenado sobre datos de mercado reales. Utiliza un entorno personalizado compatible con Gym y se basa en el algoritmo SAC para entrenar un agente que asigna dinámicamente pesos entre activos financieros (oro, renta fija, renta variable y efectivo).
-
-> ⚠️ **Este README es provisional**. Aún faltan por completar algunos scripts (`02_explore_data.py`, `05_evaluate_agent.py`). Se actualizará con instrucciones completas en cuanto estén finalizados.
-
----
+Este repositorio implementa un sistema de gestión de carteras mediante aprendizaje por refuerzo profundo. Utiliza un entorno compatible con Gym y se apoya en el algoritmo SAC para asignar dinámicamente pesos entre SPY, TLT, GLD y efectivo.
 
 ## Cómo ejecutar el proyecto
 
-Todas las acciones relevantes están organizadas en scripts dentro de la carpeta `scripts/`. Cada uno de ellos representa una etapa del flujo completo de trabajo:
+Los principales pasos de trabajo se encapsulan en scripts dentro de la carpeta `scripts/`:
 
-### `01_download_data.py`  
-Descarga y guarda datos históricos de activos financieros (Yahoo Finance) y variables macroeconómicas (FRED).
+### `01_download_data.py`
+Descarga los precios históricos de los activos y los indicadores macroeconómicos necesarios.
 
 ```bash
 python scripts/01_download_data.py
-````
-
----
+```
 
 ### `02_explore_data.py`
+Genera las visualizaciones utilizadas en la memoria del proyecto a partir del archivo `datasets/combined_data.csv`.
 
-(En desarrollo) Realizará una exploración inicial de los datos: distribución de retornos, visualización de variables macro, etc.
-
----
+```bash
+python scripts/02_explore_data.py
+```
 
 ### `03_test_env.py`
-
-Permite probar el entorno de inversión con un agente aleatorio o con reglas fijas, para verificar su correcto funcionamiento.
+Crea el entorno de inversión y ejecuta dos políticas baseline predefinidas (pesos iguales y SPY únicamente) para comprobar que el entorno funciona correctamente.
 
 ```bash
 python scripts/03_test_env.py
 ```
 
----
-
 ### `04_train_agent.py`
-
-Entrena un agente con el algoritmo **Soft Actor-Critic (SAC)** utilizando el entorno personalizado. Contiene parámetros ajustables por el usuario como el tamaño de la ventana de observaciones, la frecuencia de rebalanceo o el coste de transacción. 
+Entrena un agente con SAC. El script permite ajustar, entre otros parámetros, los rangos de entrenamiento y validación, la semilla, la frecuencia de evaluación y los pasos totales.
 
 ```bash
 python scripts/04_train_agent.py
 ```
 
----
-
 ### `05_evaluate_agent.py`
+Carga un modelo entrenado y lo evalúa frente a las estrategias clásicas implementadas en `src/benchmarks.py`.
 
-(En desarrollo) Permitirá cargar un modelo ya entrenado, evaluar su rendimiento en un conjunto de test y compararlo con estrategias benchmark.
-
----
+```bash
+python scripts/05_evaluate_agent.py
+```
 
 ## 📁 Estructura de carpetas
 
 ```
 drl_portfolio/
 │
-├── scripts/                   # Scripts principales (flujo de usuario)
+├── scripts/
 │   ├── 01_download_data.py
-│   ├── 02_explore_data.py     ← en blanco (pendiente)
+│   ├── 02_explore_data.py
 │   ├── 03_test_env.py
 │   ├── 04_train_agent.py
-│   ├── 05_evaluate_agent.py   ← en blanco (pendiente)
+│   └── 05_evaluate_agent.py
 │
-├── src/                       # Lógica auxiliar y clases internas
-│   ├── data.py                # Funciones para cargar y preparar datasets
+├── src/
+│   ├── data.py                # Carga y preparación de datasets
 │   ├── observation_builder.py # Construcción del estado observable
-│   ├── portfolio_env.py       # Entorno personalizado de inversión (Gym)
-│   ├── evaluation.py          # Métricas: retorno, Sharpe, drawdown, etc.
+│   ├── portfolio_env.py       # Entorno personalizado de inversión
+│   ├── metrics.py             # Métricas de rendimiento
+│   ├── benchmarks.py          # Estrategias de referencia
+│   ├── train.py               # Lógica de entrenamiento y evaluación
+│   └── visualizations.py      # Generación de gráficos de métricas
 │
-├── models/                    # Modelos entrenados (⚠️ generados en tiempo de ejecución)
-├── datasets/                  # Archivos de datos descargados y procesados (⚠️ autogenerado)
+├── models/                    # Modelos entrenados
+├── datasets/                  # Datos brutos y procesados
 ├── results/
-│   ├── explore_data/          # Gráficos y estadísticas exploratorias
-│   └── model_training/        # Logs de entrenamiento, evolución de métricas
+│   ├── explore_data/          # Gráficos del script 02_explore_data
+│   ├── model_training/        # Métricas y logs de entrenamiento
+│   ├── model_evaluation/      # Resultados de evaluación del agente
+│   └── visualizations/        # Comparativas generadas por visualizations.py
 ```
 
----
+## Estado del proyecto
 
-## Estado actual del proyecto
+* Entorno Gym funcional y políticas baseline incluidas.
+* Entrenamiento configurable mediante `train.py`.
+* Evaluación y comparación con benchmarks tradicionales.
+* Herramientas para generar visualizaciones de entrenamiento y evaluación.
 
-* Entorno Gym personalizado y funcional.
-* SAC entrenado con múltiples configuraciones.
-* Validación con ventanas temporales separadas.
-* Scripts de exploración y evaluación en construcción.
-* Análisis detallado de pesos y comparación con benchmarks tradicionales en proceso.
+## Lógica interna
 
----
-
-## Lógica interna (breve)
-
-* **`portfolio_env.py`** define las reglas del entorno: observación del estado, recompensas, penalización por rebalanceo.
-* **`observation_builder.py`** construye una matriz 3D de observaciones a partir de retornos, indicadores técnicos y datos macroeconómicos.
-* **`evaluation.py`** implementa métricas estándar de rendimiento ajustado por riesgo.
-* **`data.py`** maneja la descarga, almacenamiento y estructuración de los datos.
+* **`portfolio_env.py`**: define la dinámica de la cartera, las recompensas y los costes de transacción.
+* **`observation_builder.py`**: crea las observaciones que recibe el agente a partir de precios, indicadores y datos macro.
+* **`metrics.py`**: calcula retorno final, ratio de Sharpe, drawdown y otras métricas de rendimiento.
+* **`benchmarks.py`**: implementa las estrategias clásicas contra las que se evalúa el agente.
+* **`train.py`**: orquesta el entrenamiento y la validación del modelo.
