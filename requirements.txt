@@ -8,6 +8,7 @@ matplotlib>=3.4.0
 # Reinforcement learning
 stable-baselines3>=1.8.0
 gym>=0.21.0
+sb3-contrib>=2.0.0
 
 # Deep learning backend
 torch>=1.10.0
@@ -24,6 +25,9 @@ fredapi>=2.0.0
 
 # Technical analysis indicators
 ta>=0.8.0
+
+# Scientific computing
+scipy>=1.7.0
 
 # Gym environment
 gymnasium>=0.26.0
